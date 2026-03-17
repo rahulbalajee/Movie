@@ -1,4 +1,4 @@
-package pkg
+package model
 
 // Metadata defines the Movie metadata
 type Metadata struct {
