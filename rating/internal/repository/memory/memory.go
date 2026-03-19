@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"sync"
 
 	"github.com/rahulbalajee/Movie/rating/internal/repository"
 	"github.com/rahulbalajee/Movie/rating/pkg/model"
@@ -10,6 +11,7 @@ import (
 // Repository defines a rating repository
 type Repository struct {
 	data map[model.RecordType]map[model.RecordID][]model.Rating
+	mu   sync.RWMutex
 }
 
 // Factory to create the repository
@@ -21,6 +23,8 @@ func NewRepo() *Repository {
 
 // Get retrieves all ratings for a given record
 func (r *Repository) Get(ctx context.Context, recordID model.RecordID, recordType model.RecordType) ([]model.Rating, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if _, ok := r.data[recordType]; !ok {
 		return nil, repository.ErrNotFound
 	}
@@ -35,6 +39,8 @@ func (r *Repository) Get(ctx context.Context, recordID model.RecordID, recordTyp
 
 // Put adds rating for a given record
 func (r *Repository) Put(ctx context.Context, recordID model.RecordID, recordType model.RecordType, rating *model.Rating) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if _, ok := r.data[recordType]; !ok {
 		r.data[recordType] = map[model.RecordID][]model.Rating{}
 	}
