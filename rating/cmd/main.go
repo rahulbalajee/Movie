@@ -24,7 +24,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /rating", http.HandlerFunc(h.GetRating))
-	mux.Handle("PUT /rating", http.HandlerFunc(h.PutRating))
+	//mux.Handle("PUT /rating", http.HandlerFunc(h.PutRating))
 
 	srv := &http.Server{
 		Addr:              port,
