@@ -1,28 +1,30 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/rahulbalajee/Movie/metadata/internal/controller/metadata"
-	httphandler "github.com/rahulbalajee/Movie/metadata/internal/handler/http"
-	"github.com/rahulbalajee/Movie/metadata/internal/repository/memory"
+	"github.com/rahulbalajee/Movie/rating/internal/controller/rating"
+	httphandler "github.com/rahulbalajee/Movie/rating/internal/handler/http"
+	"github.com/rahulbalajee/Movie/rating/internal/repository/memory"
 )
 
 var (
-	port = ":8081"
+	port = ":8082"
 )
 
 func main() {
-	log.Println("Starting the movie metadata service")
+	fmt.Println("Starting the rating service")
 
 	repo := memory.NewRepo()
-	ctrl := metadata.NewController(repo)
+	ctrl := rating.NewController(repo)
 	h := httphandler.NewHandler(ctrl)
 
 	mux := http.NewServeMux()
-	mux.Handle("GET /metadata", http.HandlerFunc(h.GetMetadata))
+	mux.Handle("GET /rating", http.HandlerFunc(h.GetRating))
+	mux.Handle("PUT /rating", http.HandlerFunc(h.PutRating))
 
 	srv := &http.Server{
 		Addr:              port,
