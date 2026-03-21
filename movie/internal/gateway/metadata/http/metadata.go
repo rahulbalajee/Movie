@@ -11,11 +11,13 @@ import (
 	"github.com/rahulbalajee/Movie/movie/internal/gateway"
 )
 
+// Gateway defines a movie metadata HTTP gateway
 type Gateway struct {
-	client *http.Client
 	addr   string
+	client *http.Client
 }
 
+// New creates a new HTTP gateway for movie metadata service
 func New(addr string) *Gateway {
 	return &Gateway{
 		addr:   addr,
@@ -23,12 +25,12 @@ func New(addr string) *Gateway {
 	}
 }
 
+// Get gets movie metadata by a movie id
 func (g *Gateway) Get(ctx context.Context, id string) (*model.Metadata, error) {
-	req, err := http.NewRequest(http.MethodGet, g.addr+"/metadata", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.addr+"/metadata", nil)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 
 	values := req.URL.Query()
 	values.Add("id", id)
