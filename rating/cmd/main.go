@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -16,7 +15,7 @@ var (
 )
 
 func main() {
-	fmt.Println("Starting the rating service")
+	log.Println("Starting the rating service")
 
 	repo := memory.NewRepo()
 	ctrl := rating.NewController(repo)

@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/rahulbalajee/Movie/metadata/internal/controller/metadata"
-	"github.com/rahulbalajee/Movie/metadata/internal/repository"
 )
 
 // Handler defines the movie metadata HTTP handler
@@ -33,7 +32,7 @@ func (h *Handler) GetMetadata(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	m, err := h.ctrl.Get(ctx, id)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, metadata.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
