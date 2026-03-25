@@ -56,7 +56,7 @@ func (r *Registry) Deregister(ctx context.Context, instanceId string, _ string) 
 	return r.client.Agent().ServiceDeregister(instanceId)
 }
 
-func (r *Registry) ReportHealthState(instanceId string, _ string) error {
+func (r *Registry) ReportHealthyState(instanceId string, _ string) error {
 	return r.client.Agent().PassTTL(instanceId, "")
 }
 
