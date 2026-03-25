@@ -12,9 +12,7 @@ import (
 )
 
 var (
-	port                = ":8083"
-	metadataGatewayAddr = "http://localhost:8081"
-	ratingGatewayAddr   = "http://localhost:8082"
+	port = ":8083"
 )
 
 func main() {
