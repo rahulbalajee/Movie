@@ -5,27 +5,37 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math/rand/v2"
 	"net/http"
 	"time"
 
 	"github.com/rahulbalajee/Movie/movie/internal/gateway"
+	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/rating/pkg/model"
 )
 
 type Gateway struct {
-	addr   string
-	client *http.Client
+	registry discovery.Registry
+	client   *http.Client
 }
 
-func New(addr string) *Gateway {
+func New(registry discovery.Registry) *Gateway {
 	return &Gateway{
-		addr:   addr,
-		client: &http.Client{Timeout: 10 * time.Second},
+		registry: registry,
+		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.RecordID, recordType model.RecordType) (float64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.addr+"/rating", nil)
+	addrs, err := g.registry.ServiceAddresses(ctx, "rating")
+	if err != nil {
+		return 0, err
+	}
+	url := "http://" + addrs[rand.IntN(len(addrs))] + "/rating"
+	log.Printf("calling rating service. Request: GET %s", url)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -55,6 +65,13 @@ func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.Record
 }
 
 func (g *Gateway) PutRating(ctx context.Context, recordId model.RecordID, recordType model.RecordType, rating *model.Rating) error {
+	addrs, err := g.registry.ServiceAddresses(ctx, "rating")
+	if err != nil {
+		return err
+	}
+	url := "http://" + addrs[rand.IntN(len(addrs))] + "/rating"
+	log.Printf("calling rating service. Request: PUT %s", url)
+
 	body, err := json.Marshal(map[string]any{
 		"id":     string(recordId),
 		"type":   string(recordType),
@@ -65,7 +82,7 @@ func (g *Gateway) PutRating(ctx context.Context, recordId model.RecordID, record
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, g.addr+"/rating", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
