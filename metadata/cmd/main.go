@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/rahulbalajee/Movie/metadata/internal/controller/metadata"
@@ -65,7 +68,27 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal(err)
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErr:
+		log.Printf("error starting the server: %v\n", err)
+	case sig := <-quit:
+		log.Printf("server is shutting down due to %v signal\n", sig)
+		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("failed to shutdown server gracefully: %v\n", err)
+			srv.Close()
+		}
 	}
 }
