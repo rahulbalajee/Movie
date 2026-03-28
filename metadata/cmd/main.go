@@ -42,7 +42,7 @@ func main() {
 
 	go func() {
 		for {
-			if err := registry.ReportHealthyState(instanceId, serviceName); err != nil {
+			if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
 				log.Println("failed to report healthy status", err)
 			}
 			time.Sleep(time.Second)

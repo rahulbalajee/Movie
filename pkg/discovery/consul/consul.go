@@ -75,8 +75,13 @@ func (r *Registry) Deregister(ctx context.Context, instanceId string, _ string) 
 	)
 }
 
-func (r *Registry) ReportHealthyState(instanceId string, _ string) error {
-	return r.client.Agent().PassTTL(instanceId, "")
+func (r *Registry) ReportHealthyState(ctx context.Context, instanceId string, _ string) error {
+	return r.client.Agent().UpdateTTLOpts(
+		instanceId,
+		"",
+		capi.HealthPassing,
+		(&capi.QueryOptions{}).WithContext(ctx),
+	)
 }
 
 func (r *Registry) ServiceAddresses(ctx context.Context, serviceName string) ([]string, error) {
