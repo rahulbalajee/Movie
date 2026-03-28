@@ -48,7 +48,6 @@ func main() {
 			time.Sleep(time.Second)
 		}
 	}()
-
 	defer registry.Deregister(ctx, instanceId, serviceName)
 
 	repo := memory.NewRepo()
