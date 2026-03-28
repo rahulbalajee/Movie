@@ -2,10 +2,9 @@ package consul
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"net"
 	"strconv"
-	"strings"
 
 	capi "github.com/hashicorp/consul/api"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
@@ -44,32 +43,36 @@ func NewRegistry(addr string, opts ...Option) (*Registry, error) {
 }
 
 func (r *Registry) Register(ctx context.Context, instanceId string, serviceName string, hostPort string) error {
-	parts := strings.Split(hostPort, ":")
-	if len(parts) != 2 {
-		return errors.New("hostPort must be in a form of <host>:<port>, example: localhost:8081")
-	}
-
-	port, err := strconv.Atoi(parts[1])
+	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return err
 	}
 
-	return r.client.Agent().ServiceRegister(
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
+
+	return r.client.Agent().ServiceRegisterOpts(
 		&capi.AgentServiceRegistration{
-			Address: parts[0],
+			Address: host,
 			ID:      instanceId,
 			Name:    serviceName,
-			Port:    port,
+			Port:    p,
 			Check: &capi.AgentServiceCheck{
 				CheckID: instanceId,
 				TTL:     r.ttl,
 			},
 		},
+		capi.ServiceRegisterOpts{}.WithContext(ctx),
 	)
 }
 
 func (r *Registry) Deregister(ctx context.Context, instanceId string, _ string) error {
-	return r.client.Agent().ServiceDeregister(instanceId)
+	return r.client.Agent().ServiceDeregisterOpts(
+		instanceId,
+		(&capi.QueryOptions{}).WithContext(ctx),
+	)
 }
 
 func (r *Registry) ReportHealthyState(instanceId string, _ string) error {
@@ -77,7 +80,12 @@ func (r *Registry) ReportHealthyState(instanceId string, _ string) error {
 }
 
 func (r *Registry) ServiceAddresses(ctx context.Context, serviceName string) ([]string, error) {
-	entries, _, err := r.client.Health().Service(serviceName, "", true, nil)
+	entries, _, err := r.client.Health().Service(
+		serviceName,
+		"",
+		true,
+		(&capi.QueryOptions{}).WithContext(ctx),
+	)
 	if err != nil {
 		return nil, err
 	} else if len(entries) == 0 {
