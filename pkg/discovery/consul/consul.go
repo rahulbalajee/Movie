@@ -11,11 +11,22 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 )
 
+const defaultTTL = "5s"
+
 type Registry struct {
 	client *capi.Client
+	ttl    string
 }
 
-func NewRegistry(addr string) (*Registry, error) {
+type Option func(*Registry)
+
+func WithTTL(ttl string) Option {
+	return func(r *Registry) {
+		r.ttl = ttl
+	}
+}
+
+func NewRegistry(addr string, opts ...Option) (*Registry, error) {
 	config := capi.DefaultConfig()
 	config.Address = addr
 
@@ -24,7 +35,12 @@ func NewRegistry(addr string) (*Registry, error) {
 		return nil, err
 	}
 
-	return &Registry{client: client}, nil
+	r := &Registry{client: client, ttl: defaultTTL}
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r, nil
 }
 
 func (r *Registry) Register(ctx context.Context, instanceId string, serviceName string, hostPort string) error {
@@ -46,7 +62,7 @@ func (r *Registry) Register(ctx context.Context, instanceId string, serviceName 
 			Port:    port,
 			Check: &capi.AgentServiceCheck{
 				CheckID: instanceId,
-				TTL:     "5s",
+				TTL:     r.ttl,
 			},
 		},
 	)
