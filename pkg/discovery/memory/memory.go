@@ -53,7 +53,7 @@ func (r *Registry) Deregister(ctx context.Context, instanceId string, serviceNam
 	return nil
 }
 
-func (r *Registry) ReportHealthState(instanceId string, serviceName string) error {
+func (r *Registry) ReportHealthState(ctx context.Context, instanceId string, serviceName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
