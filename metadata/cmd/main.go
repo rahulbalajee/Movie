@@ -18,36 +18,46 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 )
 
-const (
-	serviceName   = "metadata"
-	consulDevAddr = "localhost:8500"
-)
-
 func main() {
-	var port int
-	flag.IntVar(&port, "port", 8081, "API handler port")
+	var port, serviceName, consulAddr string
+	flag.StringVar(&port, "port", "8081", "API handler port")
+	flag.StringVar(&serviceName, "service-name", "metadata", "service name")
+	flag.StringVar(&consulAddr, "consul-addr", "localhost:8500", "consul address")
 	flag.Parse()
 
-	log.Printf("Starting the movie metadata service on port %d", port)
+	log.Printf("Starting the movie metadata service on port %s", port)
 
-	registry, err := consul.NewRegistry(consulDevAddr)
+	registry, err := consul.NewRegistry(consulAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	instanceId := discovery.GenerateInstanceId(serviceName)
 	ctx := context.Background()
-	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
+
+	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
 		log.Fatal(err)
 	}
 
+	healthCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	go func() {
 		for {
-			if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
-				log.Println("failed to report healthy status", err)
+			select {
+			case <-healthCtx.Done():
+				return
+			case <-ticker.C:
+				if err := registry.ReportHealthyState(healthCtx, instanceId, serviceName); err != nil {
+					log.Println("failed to report healthy status", err)
+				}
 			}
-			time.Sleep(time.Second)
 		}
 	}()
+
 	defer registry.Deregister(ctx, instanceId, serviceName)
 
 	repo := memory.NewRepo()
@@ -58,7 +68,7 @@ func main() {
 	mux.Handle("GET /metadata", http.HandlerFunc(h.GetMetadata))
 
 	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
+		Addr:              fmt.Sprintf(":%s", port),
 		Handler:           mux,
 		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,

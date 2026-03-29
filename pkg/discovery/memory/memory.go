@@ -86,7 +86,7 @@ func (r *Registry) ServiceAddresses(ctx context.Context, serviceName string) ([]
 
 	for i, instance := range instances {
 		if instance.lastActive.Before(cutoff) {
-			log.Println("instance " + i + " of service " + serviceName + " is not active, skipping")
+			log.Println("instance " + i + " of service " + serviceName + " is no longer active, skipping")
 			continue
 		}
 
