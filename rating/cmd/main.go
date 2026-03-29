@@ -15,26 +15,23 @@ import (
 	"github.com/rahulbalajee/Movie/rating/internal/repository/memory"
 )
 
-const (
-	serviceName   = "rating"
-	consulDevAddr = "localhost:8500"
-)
-
 func main() {
-	var port int
-	flag.IntVar(&port, "port", 8082, "API handler port")
+	var port, serviceName, consulAddr string
+	flag.StringVar(&port, "port", "8082", "API handler port")
+	flag.StringVar(&serviceName, "service-name", "rating", "service name")
+	flag.StringVar(&consulAddr, "consul-addr", "localhost:8500", "consul address")
 	flag.Parse()
 
-	log.Printf("Starting the rating service on port %d", port)
+	log.Printf("Starting the rating service on port %s", port)
 
-	registry, err := consul.NewRegistry(consulDevAddr)
+	registry, err := consul.NewRegistry(consulAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
 	ctx := context.Background()
-	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%d", port)); err != nil {
+	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
 		log.Fatal(err)
 	}
 
@@ -58,7 +55,7 @@ func main() {
 	mux.Handle("PUT /rating", http.HandlerFunc(h.PutRating))
 
 	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%d", port),
+		Addr:              fmt.Sprintf(":%s", port),
 		Handler:           mux,
 		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
