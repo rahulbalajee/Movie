@@ -89,9 +89,10 @@ func main() {
 
 	select {
 	case err := <-serverErr:
-		log.Printf("error starting the server: %v\n", err)
+		log.Fatalf("error starting the server: %v\n", err)
 	case sig := <-quit:
 		log.Printf("server is shutting down due to %v signal\n", sig)
+
 		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 

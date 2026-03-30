@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/rahulbalajee/Movie/pkg/discovery"
@@ -31,16 +34,27 @@ func main() {
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
 	ctx := context.Background()
+
 	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
 		log.Fatal(err)
 	}
 
+	healthCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	go func() {
 		for {
-			if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
-				log.Println("failed to report healthy status", err)
+			select {
+			case <-healthCtx.Done():
+				return
+			case <-ticker.C:
+				if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
+					log.Println("failed to report healthy status", err)
+				}
 			}
-			time.Sleep(time.Second)
 		}
 	}()
 
@@ -64,7 +78,28 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal(err)
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErr:
+		log.Fatalf("error starting the server: %v\n", err)
+	case sig := <-quit:
+		log.Printf("server is shutting down due to %v signal\n", sig)
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("failed to shutdown server gracefully: %v\n", err)
+			srv.Close()
+		}
 	}
 }
