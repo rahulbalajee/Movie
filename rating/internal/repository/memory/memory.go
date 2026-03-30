@@ -10,6 +10,7 @@ import (
 
 // Repository defines a rating repository
 type Repository struct {
+	// map[string]map[string][]Rating
 	data map[model.RecordType]map[model.RecordID][]model.Rating
 	mu   sync.RWMutex
 }
