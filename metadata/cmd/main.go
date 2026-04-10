@@ -5,17 +5,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/rahulbalajee/Movie/gen"
 	"github.com/rahulbalajee/Movie/metadata/internal/controller/metadata"
-	httphandler "github.com/rahulbalajee/Movie/metadata/internal/handler/http"
+	grpchandler "github.com/rahulbalajee/Movie/metadata/internal/handler/grpc"
 	"github.com/rahulbalajee/Movie/metadata/internal/repository/memory"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -62,43 +64,42 @@ func main() {
 
 	repo := memory.NewRepo()
 	ctrl := metadata.NewController(repo)
-	h := httphandler.NewHandler(ctrl)
+	h := grpchandler.NewHandler(ctrl)
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /metadata", http.HandlerFunc(h.GetMetadata))
-
-	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%s", port),
-		Handler:           mux,
-		ReadTimeout:       10 * time.Second,
-		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
 	}
 
-	serverErr := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			serverErr <- err
-		}
-	}()
+	srv := grpc.NewServer()
+	gen.RegisterMetadataServiceServer(srv, h)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
-	select {
-	case err := <-serverErr:
-		log.Fatalf("error starting the server: %v\n", err)
-	case sig := <-quit:
-		log.Printf("server is shutting down due to %v signal\n", sig)
-
-		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("failed to shutdown server gracefully: %v\n", err)
-			srv.Close()
+	go func() {
+		if err := srv.Serve(lis); err != nil {
+			fmt.Printf("server error: %v", err)
 		}
+	}()
+
+	<-quit
+	log.Println("Shutting down gRPC server...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("Server stopped gracefully")
+	case <-shutdownCtx.Done():
+		log.Println("Graceful shutdown timed out, forcing stop")
+		srv.Stop()
 	}
 }
