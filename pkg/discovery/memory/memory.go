@@ -10,9 +10,22 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 )
 
+const (
+	defaultCutoff = 5 * time.Second
+)
+
 type Registry struct {
 	mu           sync.RWMutex
 	serviceAddrs map[string]map[string]*serviceInstance
+	cutoff       time.Duration
+}
+
+type Options func(*Registry)
+
+func WithTTL(ttl time.Duration) Options {
+	return func(r *Registry) {
+		r.cutoff = ttl
+	}
 }
 
 type serviceInstance struct {
@@ -20,10 +33,17 @@ type serviceInstance struct {
 	lastActive time.Time
 }
 
-func NewRegistry() *Registry {
-	return &Registry{
+func NewRegistry(opts ...Options) *Registry {
+	r := &Registry{
 		serviceAddrs: map[string]map[string]*serviceInstance{},
+		cutoff:       defaultCutoff,
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func (r *Registry) Register(ctx context.Context, instanceId string, serviceName string, hostPort string) error {
@@ -82,7 +102,8 @@ func (r *Registry) ServiceAddresses(ctx context.Context, serviceName string) ([]
 	}
 
 	var res []string
-	cutoff := time.Now().Add(-5 * time.Second)
+
+	cutoff := time.Now().Add(-r.cutoff)
 
 	for i, instance := range instances {
 		if instance.lastActive.Before(cutoff) {
