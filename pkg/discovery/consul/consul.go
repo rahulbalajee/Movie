@@ -10,7 +10,9 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 )
 
-const defaultTTL = "5s"
+const (
+	defaultTTL = "5s"
+)
 
 type Registry struct {
 	client *capi.Client
@@ -31,7 +33,7 @@ func NewRegistry(addr string, opts ...Option) (*Registry, error) {
 
 	client, err := capi.NewClient(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating client from consul: %w", err)
 	}
 
 	r := &Registry{client: client, ttl: defaultTTL}
@@ -45,12 +47,12 @@ func NewRegistry(addr string, opts ...Option) (*Registry, error) {
 func (r *Registry) Register(ctx context.Context, instanceId string, serviceName string, hostPort string) error {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		return err
+		return fmt.Errorf("error splitting hostport var: %w", err)
 	}
 
 	p, err := strconv.Atoi(port)
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing port: %w", err)
 	}
 
 	return r.client.Agent().ServiceRegisterOpts(
@@ -97,7 +99,7 @@ func (r *Registry) ServiceAddresses(ctx context.Context, serviceName string) ([]
 		return nil, discovery.ErrNotFound
 	}
 
-	var res []string
+	res := []string{}
 	for _, entry := range entries {
 		res = append(res, fmt.Sprintf("%s:%d", entry.Service.Address, entry.Service.Port))
 	}
