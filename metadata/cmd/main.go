@@ -18,6 +18,7 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 func main() {
@@ -31,18 +32,16 @@ func main() {
 
 	registry, err := consul.NewRegistry(consulAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error creating consul registry: %v", err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
-	ctx := context.Background()
-
-	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
-		log.Fatal(err)
+	if err := registry.Register(context.Background(), instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
+		log.Fatalf("error registering service with consul: %v", err)
 	}
 
+	// Health reporter — pings Consul every second, exits when healthCtx is cancelled.
 	healthCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -60,8 +59,6 @@ func main() {
 		}
 	}()
 
-	defer registry.Deregister(ctx, instanceId, serviceName)
-
 	repo := memory.NewRepo()
 	ctrl := metadata.NewController(repo)
 	h := grpchandler.NewHandler(ctrl)
@@ -71,7 +68,19 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(
+		grpc.MaxRecvMsgSize(4*1024*1024), // 4MB
+		grpc.MaxSendMsgSize(4*1024*1024),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 5 * time.Minute,
+			Time:              2 * time.Minute,
+			Timeout:           20 * time.Second,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             30 * time.Second,
+			PermitWithoutStream: false,
+		}),
+	)
 	gen.RegisterMetadataServiceServer(srv, h)
 
 	quit := make(chan os.Signal, 1)
@@ -79,13 +88,22 @@ func main() {
 
 	go func() {
 		if err := srv.Serve(lis); err != nil {
-			fmt.Printf("server error: %v", err)
+			log.Printf("gRPC server stopped with error: %v", err)
+			select {
+			case quit <- syscall.SIGTERM: // trigger shutdown
+			default: // shutdown already in progress
+			}
 		}
 	}()
 
 	<-quit
 	log.Println("Shutting down gRPC server...")
 
+	// Not deferred — order matters: stop health checks, deregister, then drain.
+	cancel()
+	registry.Deregister(context.Background(), instanceId, serviceName)
+
+	// Drain in-flight RPCs with a 10s deadline.
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
