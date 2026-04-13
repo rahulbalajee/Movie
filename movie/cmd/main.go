@@ -30,14 +30,13 @@ func main() {
 
 	registry, err := consul.NewRegistry(consulAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error creating consul registry: %v", err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
-	ctx := context.Background()
 
-	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
-		log.Fatal(err)
+	if err := registry.Register(context.Background(), instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
+		log.Fatalf("error registering service with consul: %v", err)
 	}
 
 	healthCtx, cancel := context.WithCancel(context.Background())
@@ -52,20 +51,20 @@ func main() {
 			case <-healthCtx.Done():
 				return
 			case <-ticker.C:
-				if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
+				if err := registry.ReportHealthyState(healthCtx, instanceId, serviceName); err != nil {
 					log.Println("failed to report healthy status", err)
 				}
 			}
 		}
 	}()
 
-	defer registry.Deregister(ctx, instanceId, serviceName)
+	defer registry.Deregister(context.Background(), instanceId, serviceName)
 
-	metadataGateway := metadatagateway.New(registry)
-	ratingGateway := ratinggateway.New(registry)
+	metadataGateway := metadatagateway.New(registry, "metadata")
+	ratingGateway := ratinggateway.New(registry, "rating")
 
-	crtl := movie.NewController(ratingGateway, metadataGateway)
-	h := httphandler.NewHandler(crtl)
+	ctrl := movie.NewController(ratingGateway, metadataGateway)
+	h := httphandler.NewHandler(ctrl)
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /movie", http.HandlerFunc(h.GetMovieDetails))
