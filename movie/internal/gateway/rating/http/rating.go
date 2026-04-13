@@ -17,22 +17,24 @@ import (
 
 type Gateway struct {
 	registry discovery.Registry
+	svc      string
 	client   *http.Client
 }
 
-func New(registry discovery.Registry) *Gateway {
+func New(registry discovery.Registry, svc string) *Gateway {
 	return &Gateway{
 		registry: registry,
+		svc:      svc,
 		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.RecordID, recordType model.RecordType) (float64, error) {
-	addrs, err := g.registry.ServiceAddresses(ctx, "rating")
+	addrs, err := g.registry.ServiceAddresses(ctx, g.svc)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error getting service addresses: %w", err)
 	}
-	url := "http://" + addrs[rand.IntN(len(addrs))] + "/rating"
+	url := "http://" + addrs[rand.IntN(len(addrs))] + "/" + g.svc
 	log.Printf("calling rating service. Request: GET %s", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -65,17 +67,17 @@ func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.Record
 }
 
 func (g *Gateway) PutRating(ctx context.Context, recordId model.RecordID, recordType model.RecordType, rating *model.Rating) error {
-	addrs, err := g.registry.ServiceAddresses(ctx, "rating")
+	addrs, err := g.registry.ServiceAddresses(ctx, g.svc)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting service addresses: %w", err)
 	}
-	url := "http://" + addrs[rand.IntN(len(addrs))] + "/rating"
+	url := "http://" + addrs[rand.IntN(len(addrs))] + "/" + g.svc
 	log.Printf("calling rating service. Request: PUT %s", url)
 
 	body, err := json.Marshal(map[string]any{
-		"id":     string(recordId),
-		"type":   string(recordType),
-		"userId": string(rating.UserID),
+		"id":     recordId,
+		"type":   recordType,
+		"userId": rating.UserID,
 		"value":  rating.Value,
 	})
 	if err != nil {

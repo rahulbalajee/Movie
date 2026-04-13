@@ -17,24 +17,26 @@ import (
 // Gateway defines a movie metadata HTTP gateway
 type Gateway struct {
 	registry discovery.Registry
+	svc      string
 	client   *http.Client
 }
 
 // New creates a new HTTP gateway for movie metadata service
-func New(registry discovery.Registry) *Gateway {
+func New(registry discovery.Registry, svc string) *Gateway {
 	return &Gateway{
 		registry: registry,
+		svc:      svc,
 		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 // Get gets movie metadata by a movie id
 func (g *Gateway) Get(ctx context.Context, id string) (*model.Metadata, error) {
-	addrs, err := g.registry.ServiceAddresses(ctx, "metadata")
+	addrs, err := g.registry.ServiceAddresses(ctx, g.svc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting service addresses: %w", err)
 	}
-	url := "http://" + addrs[rand.IntN(len(addrs))] + "/metadata"
+	url := "http://" + addrs[rand.IntN(len(addrs))] + "/" + g.svc
 	log.Printf("calling metadata service. Request: GET %s", url)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
