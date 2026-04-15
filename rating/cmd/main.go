@@ -5,17 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/rahulbalajee/Movie/gen"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"github.com/rahulbalajee/Movie/rating/internal/controller/rating"
-	httphandler "github.com/rahulbalajee/Movie/rating/internal/handler/http"
+	grpchandler "github.com/rahulbalajee/Movie/rating/internal/handler/grpc"
 	"github.com/rahulbalajee/Movie/rating/internal/repository/memory"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 func main() {
@@ -33,14 +36,12 @@ func main() {
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
-	ctx := context.Background()
 
-	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
+	if err := registry.Register(context.Background(), instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
 		log.Fatalf("error registering service with consul: %v", err)
 	}
 
 	healthCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -51,55 +52,71 @@ func main() {
 			case <-healthCtx.Done():
 				return
 			case <-ticker.C:
-				if err := registry.ReportHealthyState(ctx, instanceId, serviceName); err != nil {
+				if err := registry.ReportHealthyState(healthCtx, instanceId, serviceName); err != nil {
 					log.Println("failed to report healthy status", err)
 				}
 			}
 		}
 	}()
 
-	defer registry.Deregister(ctx, instanceId, serviceName)
-
 	repo := memory.NewRepo()
 	ctrl := rating.NewController(repo)
-	h := httphandler.NewHandler(ctrl)
+	h := grpchandler.NewHandler(ctrl)
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /rating", http.HandlerFunc(h.GetRating))
-	mux.Handle("PUT /rating", http.HandlerFunc(h.PutRating))
-
-	srv := &http.Server{
-		Addr:              fmt.Sprintf(":%s", port),
-		Handler:           mux,
-		ReadTimeout:       10 * time.Second,
-		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
 	}
 
-	serverErr := make(chan error, 1)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			serverErr <- err
-		}
-	}()
+	srv := grpc.NewServer(
+		grpc.MaxRecvMsgSize(4*1024*1024), // 4MB
+		grpc.MaxSendMsgSize(4*1024*1024),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 5 * time.Minute,
+			Time:              2 * time.Minute,
+			Timeout:           20 * time.Second,
+		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             30 * time.Second,
+			PermitWithoutStream: false,
+		}),
+	)
+	gen.RegisterRatingServiceServer(srv, h)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
-	select {
-	case err := <-serverErr:
-		log.Fatalf("error starting the server: %v\n", err)
-	case sig := <-quit:
-		log.Printf("server is shutting down due to %v signal\n", sig)
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("failed to shutdown server gracefully: %v\n", err)
-			srv.Close()
+	go func() {
+		if err := srv.Serve(lis); err != nil {
+			log.Printf("gRPC server stopped with error: %v", err)
+			select {
+			case quit <- syscall.SIGTERM: // trigger shutdown
+			default: // shutdown already in progress
+			}
 		}
+	}()
+
+	<-quit
+	log.Println("Shutting down gRPC server...")
+
+	// Not deferred — order matters: stop health checks, deregister, then drain.
+	cancel()
+	registry.Deregister(context.Background(), instanceId, serviceName)
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	done := make(chan struct{})
+	go func() {
+		srv.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("Server stopped gracefully")
+	case <-shutdownCtx.Done():
+		log.Println("Graceful shutdown timed out, forcing stop")
+		srv.Stop()
 	}
 }
