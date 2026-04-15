@@ -29,14 +29,14 @@ func main() {
 
 	registry, err := consul.NewRegistry(consulAddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error creating consul registry: %v", err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
 	ctx := context.Background()
 
 	if err := registry.Register(ctx, instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
-		log.Fatal(err)
+		log.Fatalf("error registering service with consul: %v", err)
 	}
 
 	healthCtx, cancel := context.WithCancel(context.Background())
