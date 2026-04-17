@@ -18,7 +18,7 @@ go test ./cmd/sizecompare/... -bench=.
 go test ./path/to/package -run TestName
 
 # Generate protobuf code (requires protoc, protoc-gen-go, protoc-gen-go-grpc)
-protoc -I api/ api/movie.proto --go_out=gen/ --go-grpc_out=gen/
+protoc -I api/ api/movie.proto --go_out=gen/ --go_opt=paths=source_relative --go-grpc_out=gen/ --go-grpc_opt=paths=source_relative
 ```
 
 ## Architecture
