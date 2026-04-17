@@ -97,11 +97,14 @@ func main() {
 	}()
 
 	<-quit
+	signal.Stop(quit)
 	log.Println("Shutting down gRPC server...")
 
 	// Not deferred — order matters: stop health checks, deregister, then drain.
 	cancel()
-	registry.Deregister(context.Background(), instanceId, serviceName)
+	if err := registry.Deregister(context.Background(), instanceId, serviceName); err != nil {
+		log.Printf("failed to deregister from consul: %v", err)
+	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()

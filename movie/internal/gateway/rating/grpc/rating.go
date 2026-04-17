@@ -34,7 +34,7 @@ func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.Record
 	return resp.RatingValue, nil
 }
 
-func (g *Gateway) PutRating(ctx context.Context, rating *model.Rating) error {
+func (g *Gateway) PutRating(ctx context.Context, recordId model.RecordID, recordType model.RecordType, rating *model.Rating) error {
 	conn, err := grpcutil.ServiceConnection(ctx, "rating", g.registry)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func (g *Gateway) PutRating(ctx context.Context, rating *model.Rating) error {
 
 	client := gen.NewRatingServiceClient(conn)
 
-	_, err = client.PutRating(ctx, &gen.PutRatingRequest{UserId: string(rating.UserID), RecordId: string(rating.RecordID), RecordType: string(rating.RecordType), RatingValue: int32(rating.Value)})
+	_, err = client.PutRating(ctx, &gen.PutRatingRequest{UserId: string(rating.UserID), RecordId: string(recordId), RecordType: string(recordType), RatingValue: int32(rating.Value)})
 	if err != nil {
 		return err
 	}
