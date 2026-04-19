@@ -29,8 +29,8 @@ func NewController(repo ratingRepository) *Controller {
 	}
 }
 
-// GetAggregatedRatings returns aggregated rating for a record or ErrNotFound in case no ratings exists for that record
-func (c *Controller) GetAggregatedRatings(ctx context.Context, recordID model.RecordID, recordType model.RecordType) (float64, error) {
+// GetAggregatedRating returns aggregated rating for a record or ErrNotFound in case no ratings exists for that record
+func (c *Controller) GetAggregatedRating(ctx context.Context, recordID model.RecordID, recordType model.RecordType) (float64, error) {
 	ratings, err := c.repo.Get(ctx, recordID, recordType)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
