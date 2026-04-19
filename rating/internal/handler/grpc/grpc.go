@@ -20,12 +20,12 @@ func NewHandler(ctrl *rating.Controller) *Handler {
 	return &Handler{ctrl: ctrl}
 }
 
-func (h *Handler) GetAggregatedRatings(ctx context.Context, req *gen.GetAggregatedRatingRequest) (*gen.GetAggregatedRatingResponse, error) {
+func (h *Handler) GetAggregatedRating(ctx context.Context, req *gen.GetAggregatedRatingRequest) (*gen.GetAggregatedRatingResponse, error) {
 	if req == nil || req.RecordId == "" || req.RecordType == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "nil req or empty id/type")
 	}
 
-	v, err := h.ctrl.GetAggregatedRatings(ctx, model.RecordID(req.RecordId), model.RecordType(req.RecordType))
+	v, err := h.ctrl.GetAggregatedRating(ctx, model.RecordID(req.RecordId), model.RecordType(req.RecordType))
 	if err != nil {
 		if errors.Is(err, rating.ErrNotFound) {
 			return nil, status.Errorf(codes.NotFound, "%v", err)

@@ -36,7 +36,7 @@ func (h *Handler) GetRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := h.ctrl.GetAggregatedRatings(r.Context(), recordId, recordType)
+	v, err := h.ctrl.GetAggregatedRating(r.Context(), recordId, recordType)
 	if err != nil {
 		if errors.Is(err, rating.ErrNotFound) {
 			w.WriteHeader(http.StatusNotFound)
