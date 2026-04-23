@@ -1,0 +1,42 @@
+[
+  {
+    "recordId": "1",
+    "recordType": "movie",
+    "userId": "user-101",
+    "value": 5,
+    "providerId": "test-provider",
+    "eventType": "put"
+  },
+  {
+    "recordId": "2",
+    "recordType": "movie",
+    "userId": "user-102",
+    "value": 4,
+    "providerId": "test-provider",
+    "eventType": "put"
+  },
+  {
+    "recordId": "3",
+    "recordType": "movie",
+    "userId": "user-103",
+    "value": 3,
+    "providerId": "test-provider",
+    "eventType": "put"
+  },
+  {
+    "recordId": "1",
+    "recordType": "movie",
+    "userId": "user-104",
+    "value": 2,
+    "providerId": "test-provider",
+    "eventType": "put"
+  },
+  {
+    "recordId": "2",
+    "recordType": "movie",
+    "userId": "user-105",
+    "value": 5,
+    "providerId": "test-provider",
+    "eventType": "put"
+  }
+]
