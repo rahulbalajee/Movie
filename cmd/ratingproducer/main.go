@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -36,7 +37,10 @@ func main() {
 
 	fmt.Println("waiting " + timeout.String() + " until all events get produced")
 
-	producer.Flush(int(timeout.Milliseconds()))
+	remaining := producer.Flush(int(timeout.Milliseconds()))
+	if remaining > 0 {
+		log.Fatalf("%d messages were not delivered before timeout", remaining)
+	}
 }
 
 func readRatingEvents(filename string) ([]model.RatingEvent, error) {
@@ -55,6 +59,8 @@ func readRatingEvents(filename string) ([]model.RatingEvent, error) {
 }
 
 func produceRatingEvents(topic string, producer *kafka.Producer, events []model.RatingEvent) error {
+	deliveryChan := make(chan kafka.Event, len(events))
+
 	for _, ratingEvent := range events {
 		encodedEvent, err := json.Marshal(ratingEvent)
 		if err != nil {
@@ -64,8 +70,16 @@ func produceRatingEvents(topic string, producer *kafka.Producer, events []model.
 		if err := producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Value:          encodedEvent,
-		}, nil); err != nil {
+		}, deliveryChan); err != nil {
 			return err
+		}
+	}
+
+	for range events {
+		ev := <-deliveryChan
+		m := ev.(*kafka.Message)
+		if m.TopicPartition.Error != nil {
+			return fmt.Errorf("delivery failed: %w", m.TopicPartition.Error)
 		}
 	}
 
