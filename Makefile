@@ -28,3 +28,15 @@ consul-down:
 
 consul-logs:
 	docker logs -f consul
+
+run-rating-producer:
+	go run cmd/ratingproducer/main.go
+
+rating-producer-up:
+	docker-compose -f cmd/ratingproducer/docker-compose.yaml up -d
+
+rating-producer-down:
+	docker-compose -f cmd/ratingproducer/docker-compose.yaml down
+
+rating-producer-logs:
+	docker-compose -f cmd/ratingproducer/docker-compose.yaml logs -f
