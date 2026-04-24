@@ -3,6 +3,7 @@ package rating
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/rahulbalajee/Movie/rating/internal/repository"
 	"github.com/rahulbalajee/Movie/rating/pkg/model"
@@ -17,16 +18,46 @@ type ratingRepository interface {
 	Put(ctx context.Context, recordID model.RecordID, recordType model.RecordType, rating *model.Rating) error
 }
 
+type ratingIngester interface {
+	Ingest(ctx context.Context) (chan model.RatingEvent, error)
+}
+
 // Controller defines the rating service controller
 type Controller struct {
-	repo ratingRepository
+	repo     ratingRepository
+	ingester ratingIngester
 }
 
 // Factory function to create a new controller
-func NewController(repo ratingRepository) *Controller {
+func NewController(repo ratingRepository, ingester ratingIngester) *Controller {
 	return &Controller{
-		repo: repo,
+		repo:     repo,
+		ingester: ingester,
 	}
+}
+
+func (c *Controller) StartIngestion(ctx context.Context) error {
+	ch, err := c.ingester.Ingest(ctx)
+	if err != nil {
+		return err
+	}
+
+	for e := range ch {
+		fmt.Printf("consumed a message: %v\n", e)
+		if err := c.PutRating(
+			ctx,
+			e.RecordID,
+			e.RecordType,
+			&model.Rating{
+				UserID: e.UserID,
+				Value:  e.Value,
+			},
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetAggregatedRating returns aggregated rating for a record or ErrNotFound in case no ratings exists for that record

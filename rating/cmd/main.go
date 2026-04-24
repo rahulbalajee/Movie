@@ -16,6 +16,7 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"github.com/rahulbalajee/Movie/rating/internal/controller/rating"
 	grpchandler "github.com/rahulbalajee/Movie/rating/internal/handler/grpc"
+	"github.com/rahulbalajee/Movie/rating/internal/ingester/kafka"
 	"github.com/rahulbalajee/Movie/rating/internal/repository/memory"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
@@ -60,7 +61,18 @@ func main() {
 	}()
 
 	repo := memory.NewRepo()
-	ctrl := rating.NewController(repo)
+
+	ingester, err := kafka.NewIngester("localhost", "rating", "ratings")
+	if err != nil {
+		log.Fatalf("failed to initialize ingester: %v", err)
+	}
+
+	ctrl := rating.NewController(repo, ingester)
+
+	if err := ctrl.StartIngestion(context.Background()); err != nil {
+		log.Fatalf("failed to start ingestion: %v", err)
+	}
+
 	h := grpchandler.NewHandler(ctrl)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
