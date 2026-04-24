@@ -23,10 +23,11 @@ import (
 )
 
 func main() {
-	var port, serviceName, consulAddr string
+	var port, serviceName, consulAddr, kafkaAddr string
 	flag.StringVar(&port, "port", "8082", "API handler port")
 	flag.StringVar(&serviceName, "service-name", "rating", "service name")
 	flag.StringVar(&consulAddr, "consul-addr", "localhost:8500", "consul address")
+	flag.StringVar(&kafkaAddr, "kafka-addr", "localhost:9092", "kafka bootstrap server")
 	flag.Parse()
 
 	log.Printf("Starting the rating service on port %s", port)
@@ -62,7 +63,7 @@ func main() {
 
 	repo := memory.NewRepo()
 
-	ingester, err := kafka.NewIngester("localhost", "rating", "ratings")
+	ingester, err := kafka.NewIngester(kafkaAddr, "rating", "ratings")
 	if err != nil {
 		log.Fatalf("failed to initialize ingester: %v", err)
 	}
