@@ -17,9 +17,11 @@ type Ingester struct {
 
 func NewIngester(addr, groupId, topic string) (*Ingester, error) {
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": addr,
-		"group.id":          groupId,
-		"auto.offset.reset": "earliest",
+		"bootstrap.servers":        addr,
+		"group.id":                 groupId,
+		"auto.offset.reset":        "earliest",
+		"enable.auto.offset.store": false, // we control when offsets are "stored"
+		// enable.auto.commit stays true — it commits whatever is stored every 5s
 	})
 
 	if err != nil {
@@ -66,6 +68,9 @@ func (i *Ingester) Ingest(ctx context.Context) (chan model.RatingEvent, error) {
 
 			select {
 			case ch <- event:
+				if _, err := i.consumer.StoreMessage(msg); err != nil {
+					fmt.Println("store offset error:", err.Error())
+				}
 			case <-ctx.Done():
 				return
 			}
