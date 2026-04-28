@@ -15,6 +15,7 @@ var ErrNotFound = errors.New("not found")
 // metadataRepository implements the database repository on the reciever side
 type metadataRepository interface {
 	Get(ctx context.Context, id string) (*model.Metadata, error)
+	Put(ctx context.Context, id string, metadata *model.Metadata) error
 }
 
 // Controller defines a metadata service controller
