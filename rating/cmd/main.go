@@ -17,7 +17,7 @@ import (
 	"github.com/rahulbalajee/Movie/rating/internal/controller/rating"
 	grpchandler "github.com/rahulbalajee/Movie/rating/internal/handler/grpc"
 	"github.com/rahulbalajee/Movie/rating/internal/ingester/kafka"
-	"github.com/rahulbalajee/Movie/rating/internal/repository/memory"
+	"github.com/rahulbalajee/Movie/rating/internal/repository/mysql"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
@@ -61,7 +61,10 @@ func main() {
 		}
 	}()
 
-	repo := memory.NewRepo()
+	repo, err := mysql.NewRepository("root:password@/movieexample")
+	if err != nil {
+		log.Fatalf("failed to initialize repository: %v", err)
+	}
 
 	ingester, err := kafka.NewIngester(kafkaAddr, "rating", "ratings")
 	if err != nil {
@@ -70,9 +73,11 @@ func main() {
 
 	ctrl := rating.NewController(repo, ingester)
 
-	if err := ctrl.StartIngestion(context.Background()); err != nil {
-		log.Fatalf("failed to start ingestion: %v", err)
-	}
+	go func() {
+		if err := ctrl.StartIngestion(context.Background()); err != nil {
+			log.Printf("ingestion stopped: %v", err)
+		}
+	}()
 
 	h := grpchandler.NewHandler(ctrl)
 
