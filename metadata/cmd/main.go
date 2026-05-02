@@ -14,7 +14,8 @@ import (
 	"github.com/rahulbalajee/Movie/gen"
 	"github.com/rahulbalajee/Movie/metadata/internal/controller/metadata"
 	grpchandler "github.com/rahulbalajee/Movie/metadata/internal/handler/grpc"
-	"github.com/rahulbalajee/Movie/metadata/internal/repository/memory"
+	"github.com/rahulbalajee/Movie/metadata/internal/repository/lru"
+	"github.com/rahulbalajee/Movie/metadata/internal/repository/mysql"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"google.golang.org/grpc"
@@ -59,8 +60,14 @@ func main() {
 		}
 	}()
 
-	repo := memory.NewRepo()
-	ctrl := metadata.NewController(repo)
+	repo, err := mysql.NewRepository("root:password@/movieexample")
+	if err != nil {
+		log.Fatalf("failed to initialize repository: %v", err)
+	}
+	// Bounded LRU cache in front of repo: 10K hot entries, 5m TTL so stale
+	// metadata self-heals without an explicit invalidation path.
+	cache := lru.New(10_000, 5*time.Minute)
+	ctrl := metadata.NewController(repo, cache)
 	h := grpchandler.NewHandler(ctrl)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))

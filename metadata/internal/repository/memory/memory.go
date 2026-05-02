@@ -41,3 +41,13 @@ func (r *Repository) Put(_ context.Context, id string, metadata *model.Metadata)
 	r.data[id] = metadata
 	return nil
 }
+
+// Delete removes the metadata entry for id. A delete of a non-existent
+// key is a no-op so the cache and primary store can share this contract.
+func (r *Repository) Delete(_ context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.data, id)
+	return nil
+}

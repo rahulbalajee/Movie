@@ -69,6 +69,14 @@ func (r *Repository) Put(ctx context.Context, id string, metadata *model.Metadat
 	return err
 }
 
+// Delete removes the movie row for id. Deleting a non-existent row is
+// not an error so the controller can call this unconditionally as part
+// of cache-invalidation flows.
+func (r *Repository) Delete(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM movies WHERE id = ?`, id)
+	return err
+}
+
 func (r *Repository) Close() error {
 	return r.db.Close()
 }
