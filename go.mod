@@ -6,6 +6,8 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/hashicorp/consul/api v1.33.5
+	github.com/hashicorp/golang-lru/v2 v2.0.7
+	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
@@ -22,14 +24,12 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
