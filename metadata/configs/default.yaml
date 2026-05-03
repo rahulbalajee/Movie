@@ -1,0 +1,9 @@
+api:
+  port: 8081
+  host:
+  advertiseHost: metadata
+serviceDiscovery:
+  consul:
+    address: http://consul-server.consul.svc.cluster.local:8500
+database:
+  dsn: root:password@/movieexample
