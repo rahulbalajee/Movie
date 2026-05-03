@@ -20,24 +20,45 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
-	var port, serviceName, consulAddr string
-	flag.StringVar(&port, "port", "8081", "API handler port")
+	var serviceName, configPath string
 	flag.StringVar(&serviceName, "service-name", "metadata", "service name")
-	flag.StringVar(&consulAddr, "consul-addr", "localhost:8500", "consul address")
+	flag.StringVar(&configPath, "config", "metadata/configs/default.yaml", "path to config file")
 	flag.Parse()
 
-	log.Printf("Starting the movie metadata service on port %s", port)
+	log.Println("Starting the movie metadata service")
 
-	registry, err := consul.NewRegistry(consulAddr)
+	f, err := os.Open(configPath)
+	if err != nil {
+		log.Fatalf("error opening config file: %v", err)
+	}
+	defer f.Close()
+
+	var cfg config
+	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+		log.Fatalf("error decoding config file: %v", err)
+	}
+
+	// Env vars override file values for environment-specific / sensitive settings,
+	// so prod can inject real creds via Secrets without committing them to YAML.
+	if v := os.Getenv("DB_DSN"); v != "" {
+		cfg.Database.DSN = v
+	}
+	if v := os.Getenv("CONSUL_ADDRESS"); v != "" {
+		cfg.ServiceDiscovery.Consul.Address = v
+	}
+
+	registry, err := consul.NewRegistry(cfg.ServiceDiscovery.Consul.Address)
 	if err != nil {
 		log.Fatalf("error creating consul registry: %v", err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
-	if err := registry.Register(context.Background(), instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
+	advertiseAddr := fmt.Sprintf("%s:%d", cfg.API.AdvertiseHost, cfg.API.Port)
+	if err := registry.Register(context.Background(), instanceId, serviceName, advertiseAddr); err != nil {
 		log.Fatalf("error registering service with consul: %v", err)
 	}
 
@@ -60,7 +81,7 @@ func main() {
 		}
 	}()
 
-	repo, err := mysql.NewRepository("root:password@/movieexample")
+	repo, err := mysql.NewRepository(cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("failed to initialize repository: %v", err)
 	}
@@ -70,7 +91,7 @@ func main() {
 	ctrl := metadata.NewController(repo, cache)
 	h := grpchandler.NewHandler(ctrl)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.API.Host, cfg.API.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

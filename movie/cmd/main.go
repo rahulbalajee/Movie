@@ -20,25 +20,41 @@ import (
 	"github.com/rahulbalajee/Movie/pkg/discovery/consul"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
-	var port, serviceName, consulAddr string
-	flag.StringVar(&port, "port", "8083", "API handler port")
+	var serviceName, configPath string
 	flag.StringVar(&serviceName, "service-name", "movie", "service name")
-	flag.StringVar(&consulAddr, "consul-addr", "localhost:8500", "consul address")
+	flag.StringVar(&configPath, "config", "movie/configs/default.yaml", "path to config file")
 	flag.Parse()
 
-	log.Printf("Starting the movie service on port %s", port)
+	log.Println("Starting the movie service")
 
-	registry, err := consul.NewRegistry(consulAddr)
+	f, err := os.Open(configPath)
+	if err != nil {
+		log.Fatalf("error opening config file: %v", err)
+	}
+	defer f.Close()
+
+	var cfg config
+	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+		log.Fatalf("error decoding config file: %v", err)
+	}
+
+	// Env vars override file values for environment-specific settings.
+	if v := os.Getenv("CONSUL_ADDRESS"); v != "" {
+		cfg.ServiceDiscovery.Consul.Address = v
+	}
+
+	registry, err := consul.NewRegistry(cfg.ServiceDiscovery.Consul.Address)
 	if err != nil {
 		log.Fatalf("error creating consul registry: %v", err)
 	}
 
 	instanceId := discovery.GenerateInstanceId(serviceName)
-
-	if err := registry.Register(context.Background(), instanceId, serviceName, fmt.Sprintf("localhost:%s", port)); err != nil {
+	advertiseAddr := fmt.Sprintf("%s:%d", cfg.API.AdvertiseHost, cfg.API.Port)
+	if err := registry.Register(context.Background(), instanceId, serviceName, advertiseAddr); err != nil {
 		log.Fatalf("error registering service with consul: %v", err)
 	}
 
@@ -66,7 +82,7 @@ func main() {
 	ctrl := movie.NewController(ratingGateway, metadataGateway)
 	h := grpchandler.NewHandler(ctrl)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.API.Host, cfg.API.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
