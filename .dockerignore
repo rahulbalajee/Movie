@@ -1,0 +1,14 @@
+.git
+.gitignore
+.vscode
+.idea
+.cursor
+*.md
+README*
+LICENSE*
+
+# Build artifacts
+metadata/main
+rating/main
+movie/main
+bin/

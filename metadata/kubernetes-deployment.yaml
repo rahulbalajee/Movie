@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metadata
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: metadata
+  template:
+    metadata:
+      labels:
+        app: metadata
+    spec:
+      containers:
+        - name: metadata
+          image: movie/metadata:latest
+          ports:
+            - containerPort: 8081
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_DSN
+              value: "root:password@tcp(mysql.mysql.svc.cluster.local:3306)/movieexample"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metadata
+spec:
+  selector:
+    app: metadata
+  ports:
+    - name: grpc
+      port: 8081
+      targetPort: 8081
