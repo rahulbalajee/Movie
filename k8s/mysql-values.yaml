@@ -1,0 +1,27 @@
+auth:
+  rootPassword: password
+  database: movieexample
+
+initdbScriptsConfigMap: mysql-init-scripts
+
+# As of Aug 2025, Bitnami moved free images out of docker.io/bitnami/* into
+# docker.io/bitnamilegacy/*. The chart still defaults to the old paths, so
+# we override here to keep pulls working without a paid Bitnami subscription.
+#
+# Pin to MySQL 8.4 LTS: the chart's default of MySQL 9.x rejects the
+# `source` client command that Bitnami's init script uses for /docker-
+# entrypoint-initdb.d/*.sql files, causing init to fail.
+image:
+  repository: bitnamilegacy/mysql
+  tag: 8.4.5-debian-12-r0
+
+primary:
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
