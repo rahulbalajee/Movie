@@ -64,6 +64,11 @@ func (r *Registry) Register(ctx context.Context, instanceId string, serviceName 
 			Check: &capi.AgentServiceCheck{
 				CheckID: instanceId,
 				TTL:     r.ttl,
+				// Auto-deregister entries whose TTL check has been failing for >1m.
+				// Without this, crashes/SIGKILLs that bypass our graceful Deregister
+				// leave zombie entries in Consul forever (Consul's internal minimum
+				// is 1m — anything lower is silently rounded up).
+				DeregisterCriticalServiceAfter: "1m",
 			},
 		},
 		capi.ServiceRegisterOpts{}.WithContext(ctx),
