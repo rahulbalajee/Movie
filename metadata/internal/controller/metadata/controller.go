@@ -1,5 +1,7 @@
 package metadata
 
+//go:generate mockgen -source=controller.go -destination=mocks_test.go -package=metadata
+
 import (
 	"context"
 	"errors"
