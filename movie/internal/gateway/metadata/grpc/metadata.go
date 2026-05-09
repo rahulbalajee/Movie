@@ -6,7 +6,10 @@ import (
 	"github.com/rahulbalajee/Movie/gen"
 	"github.com/rahulbalajee/Movie/internal/grpcutil"
 	"github.com/rahulbalajee/Movie/metadata/pkg/model"
+	"github.com/rahulbalajee/Movie/movie/internal/gateway"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Gateway struct {
@@ -28,6 +31,9 @@ func (g *Gateway) Get(ctx context.Context, id string) (*model.Metadata, error) {
 
 	resp, err := client.GetMetadata(ctx, &gen.GetMetadataRequest{MovieId: id})
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, gateway.ErrNotFound
+		}
 		return nil, err
 	}
 

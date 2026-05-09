@@ -5,8 +5,11 @@ import (
 
 	"github.com/rahulbalajee/Movie/gen"
 	"github.com/rahulbalajee/Movie/internal/grpcutil"
+	"github.com/rahulbalajee/Movie/movie/internal/gateway"
 	"github.com/rahulbalajee/Movie/pkg/discovery"
 	"github.com/rahulbalajee/Movie/rating/pkg/model"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Gateway struct {
@@ -28,6 +31,11 @@ func (g *Gateway) GetAggregatedRating(ctx context.Context, recordId model.Record
 
 	resp, err := client.GetAggregatedRating(ctx, &gen.GetAggregatedRatingRequest{RecordId: string(recordId), RecordType: string(recordType)})
 	if err != nil {
+		// Translate the gRPC status to our domain sentinel so callers can
+		// use errors.Is(err, gateway.ErrNotFound) without depending on gRPC types.
+		if status.Code(err) == codes.NotFound {
+			return 0, gateway.ErrNotFound
+		}
 		return 0, err
 	}
 

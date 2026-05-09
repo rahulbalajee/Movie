@@ -51,13 +51,15 @@ func (c *Controller) Get(ctx context.Context, id string) (*model.MovieDetails, e
 	}
 
 	rating, err := c.ratingGateway.GetAggregatedRating(ctx, ratingmodel.RecordID(id), ratingmodel.RecordTypeMovie)
-	if err != nil {
-		if errors.Is(err, gateway.ErrNotFound) {
-			// Just proceed in this case, it's ok not to have ratings yet
-		}
+	switch {
+	case errors.Is(err, gateway.ErrNotFound):
+		// A movie with no ratings yet is a valid response — leave details.Rating
+		// unset and let the handler render a zero/absent rating.
+	case err != nil:
 		return nil, err
+	default:
+		details.Rating = &rating
 	}
-	details.Rating = &rating
 
 	return details, nil
 }

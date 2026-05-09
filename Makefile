@@ -2,7 +2,8 @@
 	build-metadata build-rating build-movie build-all clean \
 	consul-up consul-down consul-logs \
 	run-rating-producer rating-producer-up rating-producer-down rating-producer-logs \
-	k8s-apply k8s-delete k8s-status
+	k8s-apply k8s-delete k8s-status \
+	proto proto-tools
 
 run-metadata:
 	go run metadata/cmd/main.go
@@ -88,3 +89,17 @@ k8s-status:
 	@kubectl get pods -n consul 2>/dev/null || echo "consul namespace not found"
 	@kubectl get pods -n mysql 2>/dev/null  || echo "mysql namespace not found"
 	@kubectl get pods -n kafka 2>/dev/null  || echo "kafka namespace not found"
+
+# ---------------------------------------------------------------------------
+# Protobuf
+# ---------------------------------------------------------------------------
+# Regenerate gen/movie.pb.go and gen/movie_grpc.pb.go from api/movie.proto.
+# Requires protoc + the two Go plugins (run `make proto-tools` once to install).
+proto:
+	protoc -I api/ api/movie.proto \
+		--go_out=gen/ --go_opt=paths=source_relative \
+		--go-grpc_out=gen/ --go-grpc_opt=paths=source_relative
+
+proto-tools:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
