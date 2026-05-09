@@ -32,9 +32,14 @@ go build ./metadata/cmd ./rating/cmd ./movie/cmd ./cmd/ratingproducer ./cmd/size
 go test ./...
 go test ./cmd/sizecompare/... -bench=.            # serialization size benchmarks
 go test ./path/to/package -run TestName           # single test
+go generate ./metadata/internal/controller/metadata/...  # regenerate mockgen-produced mocks_test.go
 
-# Regenerate protobuf code (requires protoc, protoc-gen-go, protoc-gen-go-grpc)
-protoc -I api/ api/movie.proto --go_out=gen/ --go_opt=paths=source_relative --go-grpc_out=gen/ --go-grpc_opt=paths=source_relative
+# Run the in-process integration harness (boots all three services with memory deps)
+go run ./test/integration
+
+# Regenerate protobuf code
+make proto-tools                                  # one-time: installs protoc-gen-go(-grpc)
+make proto                                        # regenerates gen/ from api/movie.proto
 
 # Apply MySQL schema (DSN defaults to root:password@/movieexample in configs/default.yaml)
 mysql -u root -p movieexample < schema/schema.sql
@@ -73,6 +78,13 @@ The rating service has two write paths: synchronous gRPC `PutRating` calls, and 
 ### Shared packages
 
 `pkg/discovery/` defines the `Registry` interface (Register, Deregister, ServiceAddresses, ReportHealthyState) with two implementations: `consul/` (production, requires Consul at localhost:8500) and `memory/` (in-process, for testing). `internal/grpcutil/` centralizes the discovery → gRPC dial dance used by every gateway.
+
+### Testing
+
+Two layers of tests live in this repo:
+
+- **Unit tests with mockgen**: `metadata/internal/controller/metadata/controller_test.go` exercises the cache + singleflight controller against `gomock`-generated mocks of `metadataRepository`. The `//go:generate mockgen -source=controller.go -destination=mocks_test.go -package=metadata` directive at the top of `controller.go` regenerates `mocks_test.go` — re-run `go generate` whenever the `metadataRepository` interface changes.
+- **In-process integration harness**: `test/integration/main.go` is a runnable `main` (not a `_test.go`) that boots all three gRPC services in-process using `pkg/discovery/memory` as the registry, then makes real client calls across the full flow. Each service has a `pkg/<svc>test/` helper (e.g. `metadata/pkg/metadatatest/`) that wires repo+controller+handler with the memory repo so the harness doesn't need MySQL, Kafka, or Consul.
 
 ### Protobuf / gRPC
 
