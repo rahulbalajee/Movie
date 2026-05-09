@@ -33,10 +33,14 @@ func (h *Handler) GetMovieDetails(ctx context.Context, req *gen.GetMovieDetailsR
 		return nil, status.Errorf(codes.Internal, "%v", err)
 	}
 
-	return &gen.GetMovieDetailsResponse{
+	resp := &gen.GetMovieDetailsResponse{
 		MovieDetails: &gen.Movie{
-			Rating:   *m.Rating,
 			Metadata: model.MetadataToProto(&m.Metadata),
 		},
-	}, nil
+	}
+	// Rating is optional — a movie with no ratings yet has m.Rating == nil.
+	if m.Rating != nil {
+		resp.MovieDetails.Rating = *m.Rating
+	}
+	return resp, nil
 }

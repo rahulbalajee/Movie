@@ -16,7 +16,7 @@ type Registry interface {
 	Deregister(ctx context.Context, instanceId string, serviceName string) error
 	// ServiceAddresses returns the list of addresses of active instances of a given service
 	ServiceAddresses(ctx context.Context, serviceId string) ([]string, error)
-	// ReportHealthState is a push mechanism for reporting healthy state to a registry
+	// ReportHealthyState is a push mechanism for reporting healthy state to a registry
 	ReportHealthyState(ctx context.Context, instanceId string, serviceName string) error
 }
 
